@@ -1,91 +1,79 @@
-const GITHUB_RAW_URL = 'db.json';
-let allProducts = []; // Lưu trữ dữ liệu gốc
+const POST_API = 'http://localhost:3000/posts';
+const COMMENT_API = 'http://localhost:3000/comments';
+let allPosts = [];
 
-// 1. Khởi tạo ứng dụng
-async function init() {
-    const loading = document.getElementById('loading');
-    try {
-        const response = await fetch(GITHUB_RAW_URL);
-        if (!response.ok) throw new Error('Kết nối thất bại');
-        
-        allProducts = await response.json();
-        loading.classList.add('d-none');
-        
-        renderTable(allProducts); // Hiển thị lần đầu
-        setupListeners(); // Thiết lập tìm kiếm và sắp xếp
-    } catch (error) {
-        loading.innerHTML = `<div class="alert alert-danger">Lỗi: ${error.message}</div>`;
-        console.error('Error:', error);
-    }
+// 1. Hàm bổ trợ: Tạo ID tự tăng (Max + 1) và trả về String
+async function generateNextId(apiUrl) {
+    const res = await fetch(apiUrl);
+    const data = await res.json();
+    if (data.length === 0) return "1";
+    const maxId = Math.max(...data.map(item => parseInt(item.id)));
+    return (maxId + 1).toString();
 }
 
-// 2. Hàm hiển thị dữ liệu vào Bảng
-function renderTable(products) {
+// 2. Chức năng hiển thị (Render) - Có xử lý gạch ngang cho Post xóa mềm
+function renderTable(posts) {
     const tableBody = document.getElementById('productTableBody');
-    const noResult = document.getElementById('noResult');
     tableBody.innerHTML = '';
 
-    if (products.length === 0) {
-        noResult.classList.remove('d-none');
-    } else {
-        noResult.classList.add('d-none');
-        products.forEach(product => {
-            const row = `
-                <tr>
-                    <td><span class="text-muted small">#${product.id}</span></td>
-                    <td>
-                        <img src="${product.images[0]}" class="product-img-table" 
-                             onerror="this.src='https://placehold.co/100?text=No+Img'">
-                    </td>
-                    <td>
-                        <div class="fw-bold">${product.title}</div>
-                        <div class="text-muted x-small text-truncate" style="max-width: 250px;">
-                            ${product.description}
-                        </div>
-                    </td>
-                    <td><span class="badge bg-info text-dark">${product.category.name}</span></td>
-                    <td><span class="fw-bold text-danger">$${product.price}</span></td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-primary">Sửa</button>
-                        <button class="btn btn-sm btn-outline-danger">Xóa</button>
-                    </td>
-                </tr>
-            `;
-            tableBody.innerHTML += row;
-        });
-    }
+    posts.forEach(post => {
+        const isDeleted = post.isDeleted === true;
+        // Thêm style gạch ngang nếu post đã bị xóa mềm
+        const rowStyle = isDeleted ? 'style="text-decoration: line-through; opacity: 0.5;"' : '';
+        
+        const row = `
+            <tr ${rowStyle}>
+                <td>#${post.id}</td>
+                <td><div class="fw-bold">${post.title}</div></td>
+                <td>${post.views} views</td>
+                <td>
+                    ${!isDeleted ? `<button onclick="softDeletePost('${post.id}')" class="btn btn-sm btn-outline-danger">Xoá mềm</button>` : '<span class="badge bg-secondary">Đã xoá</span>'}
+                </td>
+            </tr>
+        `;
+        tableBody.innerHTML += row;
+    });
 }
 
-// 3. Thiết lập Tìm kiếm (onChanged) và Sắp xếp
-function setupListeners() {
-    const searchInput = document.getElementById('searchInput');
-    const sortSelect = document.getElementById('sortSelect');
+// 3. Chức năng Xoá mềm (Sử dụng PATCH thay vì DELETE)
+async function softDeletePost(id) {
+    await fetch(`${POST_API}/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isDeleted: true })
+    });
+    init(); // Tải lại bảng
+}
 
-    const handleFilter = () => {
-        let filtered = [...allProducts];
+// 4. CRUD cho Comments
+const commentService = {
+    // Thêm comment với ID tự tăng (String)
+    create: async (text, postId) => {
+        const nextId = await generateNextId(COMMENT_API);
+        const newComment = { id: nextId, text, postId, isDeleted: false };
+        return fetch(COMMENT_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newComment)
+        });
+    },
+    // Đọc danh sách
+    getAll: () => fetch(COMMENT_API).then(res => res.json()),
+    // Cập nhật
+    update: (id, newText) => fetch(`${COMMENT_API}/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: newText })
+    }),
+    // Xoá cứng hoặc xoá mềm (tùy ý, ở đây ví dụ xoá cứng)
+    delete: (id) => fetch(`${COMMENT_API}/${id}`, { method: 'DELETE' })
+};
 
-        // Logic Tìm kiếm theo tên
-        const searchTerm = searchInput.value.toLowerCase();
-        filtered = filtered.filter(p => p.title.toLowerCase().includes(searchTerm));
-
-        // Logic Sắp xếp
-        const sortValue = sortSelect.value;
-        if (sortValue === 'name-asc') {
-            filtered.sort((a, b) => a.title.localeCompare(b.title));
-        } else if (sortValue === 'name-desc') {
-            filtered.sort((a, b) => b.title.localeCompare(a.title));
-        } else if (sortValue === 'price-asc') {
-            filtered.sort((a, b) => a.price - b.price);
-        } else if (sortValue === 'price-desc') {
-            filtered.sort((a, b) => b.price - a.price);
-        }
-
-        renderTable(filtered);
-    };
-
-    // Sự kiện "input" hoạt động như onChanged (gọi mỗi khi gõ phím)
-    searchInput.addEventListener('input', handleFilter);
-    sortSelect.addEventListener('change', handleFilter);
+// Khởi tạo app
+async function init() {
+    const response = await fetch(POST_API);
+    allPosts = await response.json();
+    renderTable(allPosts);
 }
 
 init();
