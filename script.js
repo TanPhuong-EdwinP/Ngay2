@@ -1,79 +1,118 @@
-const POST_API = 'http://localhost:3000/posts';
-const COMMENT_API = 'http://localhost:3000/comments';
-let allPosts = [];
+const BASE_URL = 'http://localhost:3000';
 
-// 1. Hàm bổ trợ: Tạo ID tự tăng (Max + 1) và trả về String
-async function generateNextId(apiUrl) {
-    const res = await fetch(apiUrl);
+// --- HÀM BỔ TRỢ ---
+
+// 1. Tạo ID tự tăng (Max + 1) và trả về String
+async function generateNextId(resource) {
+    const res = await fetch(`${BASE_URL}/${resource}`);
     const data = await res.json();
     if (data.length === 0) return "1";
-    const maxId = Math.max(...data.map(item => parseInt(item.id)));
-    return (maxId + 1).toString();
+    const ids = data.map(item => parseInt(item.id)).filter(id => !isNaN(id));
+    return (ids.length > 0 ? Math.max(...ids) + 1 : 1).toString();
 }
 
-// 2. Chức năng hiển thị (Render) - Có xử lý gạch ngang cho Post xóa mềm
-function renderTable(posts) {
-    const tableBody = document.getElementById('productTableBody');
-    tableBody.innerHTML = '';
+// --- LOGIC CHO POSTS ---
+
+async function fetchPosts() {
+    const res = await fetch(`${BASE_URL}/posts`);
+    const posts = await res.json();
+    const body = document.getElementById('postTableBody');
+    body.innerHTML = '';
 
     posts.forEach(post => {
         const isDeleted = post.isDeleted === true;
-        // Thêm style gạch ngang nếu post đã bị xóa mềm
-        const rowStyle = isDeleted ? 'style="text-decoration: line-through; opacity: 0.5;"' : '';
-        
-        const row = `
-            <tr ${rowStyle}>
+        body.innerHTML += `
+            <tr class="${isDeleted ? 'deleted-row' : ''}">
                 <td>#${post.id}</td>
-                <td><div class="fw-bold">${post.title}</div></td>
-                <td>${post.views} views</td>
+                <td>${post.title}</td>
+                <td>${post.views}</td>
+                <td>${isDeleted ? 'Đã xóa mềm' : 'Hoạt động'}</td>
                 <td>
-                    ${!isDeleted ? `<button onclick="softDeletePost('${post.id}')" class="btn btn-sm btn-outline-danger">Xoá mềm</button>` : '<span class="badge bg-secondary">Đã xoá</span>'}
+                    ${!isDeleted ? `<button class="btn btn-sm btn-danger" onclick="softDeletePost('${post.id}')">Xóa mềm</button>` : ''}
                 </td>
-            </tr>
-        `;
-        tableBody.innerHTML += row;
+            </tr>`;
     });
 }
 
-// 3. Chức năng Xoá mềm (Sử dụng PATCH thay vì DELETE)
-async function softDeletePost(id) {
-    await fetch(`${POST_API}/${id}`, {
-        method: 'PATCH',
+async function addNewPost() {
+    const title = prompt("Nhập tiêu đề bài viết:");
+    if (!title) return;
+    
+    const nextId = await generateNextId('posts');
+    await fetch(`${BASE_URL}/posts`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isDeleted: true })
+        body: JSON.stringify({ id: nextId, title, views: 0, isDeleted: false })
     });
-    init(); // Tải lại bảng
+    fetchPosts();
 }
 
-// 4. CRUD cho Comments
-const commentService = {
-    // Thêm comment với ID tự tăng (String)
-    create: async (text, postId) => {
-        const nextId = await generateNextId(COMMENT_API);
-        const newComment = { id: nextId, text, postId, isDeleted: false };
-        return fetch(COMMENT_API, {
-            method: 'POST',
+async function softDeletePost(id) {
+    if (confirm("Xóa mềm bài viết này?")) {
+        await fetch(`${BASE_URL}/posts/${id}`, {
+            method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(newComment)
+            body: JSON.stringify({ isDeleted: true })
         });
-    },
-    // Đọc danh sách
-    getAll: () => fetch(COMMENT_API).then(res => res.json()),
-    // Cập nhật
-    update: (id, newText) => fetch(`${COMMENT_API}/${id}`, {
+        fetchPosts();
+    }
+}
+
+// --- LOGIC CHO COMMENTS (CRUD ĐẦY ĐỦ) ---
+
+async function fetchComments() {
+    const res = await fetch(`${BASE_URL}/comments`);
+    const comments = await res.json();
+    const body = document.getElementById('commentTableBody');
+    body.innerHTML = '';
+
+    comments.forEach(c => {
+        if (c.isDeleted) return; // Chỉ hiện comment chưa xóa (hoặc gạch ngang tùy bạn)
+        body.innerHTML += `
+            <tr>
+                <td>#${c.id}</td>
+                <td>${c.text}</td>
+                <td>Post #${c.postId}</td>
+                <td>
+                    <button class="btn btn-sm btn-info" onclick="editComment('${c.id}', '${c.text}')">Sửa</button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteComment('${c.id}')">Xóa</button>
+                </td>
+            </tr>`;
+    });
+}
+
+async function addNewComment() {
+    const text = prompt("Nội dung bình luận:");
+    const postId = prompt("ID của bài viết (ví dụ: 1):");
+    if (!text || !postId) return;
+
+    const nextId = await generateNextId('comments');
+    await fetch(`${BASE_URL}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: nextId, text, postId, isDeleted: false })
+    });
+    fetchComments();
+}
+
+async function editComment(id, oldText) {
+    const newText = prompt("Sửa bình luận:", oldText);
+    if (!newText) return;
+    await fetch(`${BASE_URL}/comments/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: newText })
-    }),
-    // Xoá cứng hoặc xoá mềm (tùy ý, ở đây ví dụ xoá cứng)
-    delete: (id) => fetch(`${COMMENT_API}/${id}`, { method: 'DELETE' })
-};
-
-// Khởi tạo app
-async function init() {
-    const response = await fetch(POST_API);
-    allPosts = await response.json();
-    renderTable(allPosts);
+    });
+    fetchComments();
 }
 
-init();
+async function deleteComment(id) {
+    if (confirm("Xóa bình luận này?")) {
+        await fetch(`${BASE_URL}/comments/${id}`, { method: 'DELETE' });
+        fetchComments();
+    }
+}
+
+// Khởi chạy ứng dụng
+fetchPosts();
+fetchComments();
