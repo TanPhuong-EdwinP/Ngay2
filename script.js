@@ -1,5 +1,5 @@
-// Bước quan trọng: Thay link này bằng link Raw file db.json trên GitHub của bạn
-const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/username/repo/main/db.json';
+
+const GITHUB_RAW_URL = 'db.json';
 
 async function loadProducts() {
     const container = document.getElementById('productContainer');
