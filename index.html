@@ -3,33 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cửa Hàng Sản Phẩm - GitHub Data</title>
+    <title>Quản Lý Sản Phẩm - Nguyễn Võ Tấn Phương</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
-        .product-card { transition: transform 0.2s; height: 100%; }
-        .product-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
-        .product-img { height: 200px; object-fit: cover; }
-        .badge-category { position: absolute; top: 10px; right: 10px; }
+        .product-img-table { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; }
+        .sticky-top-custom { top: 20px; z-index: 1020; }
     </style>
 </head>
 <body class="bg-light">
 
-    <nav class="navbar navbar-dark bg-dark mb-4">
+    <nav class="navbar navbar-dark bg-dark mb-4 shadow">
         <div class="container">
-            <span class="navbar-brand mb-0 h1">My Store</span>
+            <span class="navbar-brand mb-0 h1">Admin Dashboard - My Store</span>
         </div>
     </nav>
 
     <div class="container">
-        <h2 class="mb-4">Danh sách sản phẩm</h2>
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Tìm kiếm sản phẩm</label>
+                        <input type="text" id="searchInput" class="form-control" placeholder="Nhập tên sản phẩm để tìm...">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Sắp xếp theo</label>
+                        <select id="sortSelect" class="form-select">
+                            <option value="default">Mặc định</option>
+                            <option value="name-asc">Tên: A-Z</option>
+                            <option value="name-desc">Tên: Z-A</option>
+                            <option value="price-asc">Giá: Thấp đến Cao</option>
+                            <option value="price-desc">Giá: Cao đến Thấp</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h3 class="mb-3">Bảng Quản Lý Sản Phẩm</h3>
         
         <div id="loading" class="text-center my-5">
             <div class="spinner-border text-primary" role="status"></div>
-            <p>Đang tải dữ liệu từ GitHub...</p>
+            <p>Đang tải dữ liệu...</p>
         </div>
 
-        <div class="row row-cols-1 row-cols-md-3 row-cols-lg-4 g-4" id="productContainer">
-            </div>
+        <div class="table-responsive card shadow-sm">
+            <table class="table table-hover align-middle mb-0 bg-white">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Hình ảnh</th>
+                        <th>Tên sản phẩm</th>
+                        <th>Danh mục</th>
+                        <th>Giá</th>
+                        <th>Hành động</th>
+                    </tr>
+                </thead>
+                <tbody id="productTableBody">
+                    </tbody>
+            </table>
+        </div>
+        <div id="noResult" class="text-center my-4 d-none">
+            <p class="text-muted">Không tìm thấy sản phẩm nào phù hợp.</p>
+        </div>
     </div>
 
     <script src="script.js"></script>
